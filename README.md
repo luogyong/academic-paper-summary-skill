@@ -40,7 +40,7 @@ mkdir -p ~/.claude/agents
 
 # 2. Download the skill
 curl -o ~/.claude/agents/academic-paper-summary.md \
-  https://raw.githubusercontent.com/gyluo/academic-paper-summary-skill/main/SKILL.md
+  https://raw.githubusercontent.com/luogyong/academic-paper-summary-skill/main/SKILL.md
 
 # 3. (Optional) Also install as slash command
 mkdir -p ~/.claude/commands
@@ -55,7 +55,7 @@ EOF
 
 ```bash
 # Clone and copy
-git clone https://github.com/gyluo/academic-paper-summary-skill.git
+git clone https://github.com/luogyong/academic-paper-summary-skill.git
 cp academic-paper-summary-skill/SKILL.md ~/.claude/agents/academic-paper-summary.md
 ```
 
@@ -210,25 +210,132 @@ The skill automatically detects your Obsidian vault by:
 
 If detected, saves directly to your current folder — **zero clicks**.
 
+---
+
 ### Claude-Obsidian Wiki Integration
 
-When [claude-obsidian](https://github.com/AgriciDaniel/claude-obsidian) wiki is configured:
+When [claude-obsidian](https://github.com/AgriciDaniel/claude-obsidian) wiki is configured, the skill goes beyond simple file saving — it performs a **full knowledge graph ingestion**, turning your paper summary into a deeply connected wiki node.
+
+#### What Happens During Wiki-Ingest
 
 ```
 Paper Summary Generated
   ↓
-Save to wiki/sources/{paper}.md (enhanced frontmatter)
-  ↓
-Extract entities → create/update wiki/entities/ pages
-  ↓
-Extract concepts → create/update wiki/concepts/ pages
-  ↓
-Cross-reference with [[wiki-link]] bidirectional links
-  ↓
-Update wiki/index.md, wiki/hot.md, wiki/log.md
+┌─ 1. Save paper page to wiki/sources/{paper}.md
+│      (enhanced frontmatter with entities, concepts, related_papers)
+│
+├─ 2. ENTITY EXTRACTION
+│      Extract authors, institutions, methods, software, datasets
+│      → Create or update wiki/entities/ pages
+│      Example: wiki/entities/O.D.L.-Strack.md
+│        wiki/entities/Analytic-Element-Method.md
+│        wiki/entities/MODFLOW.md
+│
+├─ 3. CONCEPT EXTRACTION
+│      Extract core technical concepts and theoretical frameworks
+│      → Create or update wiki/concepts/ pages
+│      Example: wiki/concepts/Complex-Potential-Theory.md
+│        wiki/concepts/Groundwater-Flow-Modeling.md
+│        wiki/concepts/Superposition-Principle.md
+│
+├─ 4. CROSS-REFERENCING
+│      → [[wiki-link]] bidirectional links between all pages
+│      → Contradiction detection: if new claims conflict with
+│        existing wiki pages, add > [!contradiction] callouts
+│
+├─ 5. UPDATE wiki/index.md
+│      Append entries for new papers, concepts, and entities
+│
+├─ 6. UPDATE wiki/hot.md
+│      Save current context for fast future session loading
+│
+└─ 7. LOG to wiki/log.md
+       Record: paper title, pages created/updated, timestamp
 ```
 
-This turns each paper summary into a **fully connected knowledge graph node**.
+#### Entity Pages (Auto-Created)
+
+For each paper, the skill creates **stub pages** for every entity mentioned:
+
+| Entity Type | Examples | Wiki Path |
+|-------------|---------|-----------|
+| **Authors** | Strack, O.D.L.; Vaswani, A. | `wiki/entities/O.D.L.-Strack.md` |
+| **Institutions** | Univ. of Minnesota; Google Brain | `wiki/entities/University-of-Minnesota.md` |
+| **Methods/Models** | AEM; Transformer; BERT | `wiki/entities/Analytic-Element-Method.md` |
+| **Software/Tools** | MODFLOW; Python; TensorFlow | `wiki/entities/MODFLOW.md` |
+| **Datasets** | CASP14; ImageNet-21K; WMT 2014 | `wiki/entities/CASP14.md` |
+
+Each entity page:
+- Summarizes the entity from the paper's perspective
+- Links back to the source paper via `[[paper-title]]`
+- Links to related concepts
+- Uses a `> [!note]` stub page marker for future expansion
+
+#### Concept Pages (Auto-Created)
+
+Core technical concepts extracted from the paper become concept pages:
+
+```markdown
+# Example: wiki/concepts/Complex-Potential-Theory.md
+---
+title: "Complex Potential Theory"
+concept_type: "theoretical-framework"
+source: "[[Theory and Applications of AEM 2026-06-05]]"
+tags: [groundwater, aem, potential-theory]
+---
+
+## Overview
+[Extracted from paper summary...]
+
+## Papers
+- [[Theory and Applications of AEM 2026-06-05]]
+```
+
+#### Index & Hot Cache Updates
+
+```markdown
+# wiki/index.md (appended entries)
+### 论文总结
+- [[Theory and Applications of AEM 2026-06-05]] — comprehensive review of AEM (2003)
+### 概念
+- [[Complex Potential Theory]] — mathematical foundation of AEM
+### 实体
+- [[O.D.L.-Strack]] — AEM pioneer, Univ. of Minnesota
+
+# wiki/hot.md (context snapshot for next session)
+## 2026-06-05 论文总结 | Theory and Applications of AEM
+- 论文: [[Theory and Applications of AEM 2026-06-05]]
+- 核心概念: [[Analytic Element Method]], [[Complex Potential Theory]], [[Groundwater Flow]]
+- 关键实体: [[O.D.L.-Strack]], [[University of Minnesota]]
+- 新建页面: 8 pages
+```
+
+#### Contradiction Detection
+
+If the paper's claims conflict with existing wiki knowledge:
+
+```markdown
+> [!contradiction] Conflict with [[Existing Page]]
+> [[Theory and Applications of AEM]] claims AEM solves 3D problems.
+> [[Numerical Methods for Groundwater]] says AEM is limited to 2D.
+> Needs resolution.
+```
+
+#### Wiki-Ingest vs Plain Save
+
+| | Plain Save | Wiki-Ingest |
+|---|-----------|-------------|
+| File saved | ✅ | ✅ |
+| Entity pages | ❌ | ✅ Auto-created |
+| Concept pages | ❌ | ✅ Auto-created |
+| Cross-references | ❌ | ✅ Bidirectional `[[]]` |
+| Index update | ❌ | ✅ `wiki/index.md` |
+| Hot cache | ❌ | ✅ `wiki/hot.md` |
+| Activity log | ❌ | ✅ `wiki/log.md` |
+| Contradiction check | ❌ | ✅ |
+| Setup required | None | `/wiki` once |
+
+---
 
 ### MinerU PDF Extraction
 
@@ -357,7 +464,7 @@ A: Yes. Language auto-detection works for Chinese and English. Output is always 
 
 ## 📝 License
 
-MIT © 2026 [gyluo](https://github.com/gyluo)
+MIT © 2026 [luogyong](https://github.com/luogyong)
 
 ---
 
