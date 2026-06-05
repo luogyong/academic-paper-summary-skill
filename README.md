@@ -82,14 +82,9 @@ In Claude Code, any of these will activate the skill:
 提取论文核心内容
 详细论文摘要
 使用FOCUS方法分析这篇论文
-
-# Batch processing:
-/summarize-folder
-批量总结论文
-批量论文总结
-总结文件夹里的论文
-summarize folder
 ```
+
+> **Tip**: `/summarize-paper` automatically detects folders and multiple files — just provide a folder path or upload multiple files to enter batch mode.
 
 ### Input Methods
 
@@ -113,20 +108,24 @@ https://arxiv.org/pdf/1706.03762.pdf
 
 ### Batch Folder Processing (NEW)
 
-Summarize all papers in a folder with a single command:
+`/summarize-paper` automatically detects when you provide a folder path or multiple files, and switches to batch mode:
 
 ```bash
-# Batch summarize all papers in a folder
-/summarize-folder ~/Downloads/papers/
+# Provide a folder path → auto batch mode
+/summarize-paper ~/Downloads/papers/
 
 # With recursive scanning (includes subfolders)
-/summarize-folder ~/Downloads/papers/ --recursive
+/summarize-paper ~/Downloads/papers/ --recursive
 
 # Skip already-summarized papers
-/summarize-folder ~/Downloads/papers/ --skip-existing
+/summarize-paper ~/Downloads/papers/ --skip-existing
 
 # Retry previously failed papers only
-/summarize-folder ~/Downloads/papers/ --retry-failed
+/summarize-paper ~/Downloads/papers/ --retry-failed
+
+# Upload multiple files at once → auto batch mode
+/summarize-paper
+@paper1.pdf @paper2.pdf @paper3.pdf
 ```
 
 The batch mode will:
@@ -135,16 +134,6 @@ The batch mode will:
 3. Run FOCUS analysis on each paper sequentially
 4. Generate individual summaries + a batch index file (`_batch_index_YYYY-MM-DD.md`)
 5. Include cross-paper thematic analysis in the index
-
-**Batch Trigger Keywords:**
-```
-/summarize-folder
-批量总结论文
-批量论文总结
-总结文件夹里的论文
-summarize folder
-batch summarize papers
-```
 
 ### Quick Start Example
 
@@ -171,12 +160,12 @@ The skill will:
 ### Batch Quick Start
 
 ```bash
-# 1. Navigate to your papers folder
+# 1. Navigate to your papers folder (or just provide the path)
 cd ~/Downloads/papers/
 
-# 2. Start Claude Code and run batch
+# 2. Start Claude Code and run — auto-detects folder
 claude
-/summarize-folder ./
+/summarize-paper ./
 
 # 3. Watch progress as each paper is processed
 # 4. Open _batch_index_YYYY-MM-DD.md for the overview
@@ -447,7 +436,7 @@ Step 4: Save & Wiki-ify
 ### Batch Folder Mode (NEW)
 
 ```
-User provides folder path (or batch trigger keyword)
+User provides folder path (or multiple files)
   ↓
 Step B0: File Discovery
 ├── Scan folder for *.pdf, *.docx, *.pptx, *.png, *.jpg
@@ -540,7 +529,7 @@ A: The skill works standalone. Choose "display Markdown" when saving, and use wi
 A: The skill preserves LaTeX formulas whenever possible. For papers with heavy equation content, formulas are kept in `$$...$$` blocks.
 
 **Q: Can I summarize multiple papers at once?**
-A: Yes! Use `/summarize-folder` to batch-process an entire folder of papers. Each paper gets a full individual summary, plus a cross-paper analysis index. You can also use `/summarize-paper` with multiple papers for comparison mode.
+A: Yes! Just provide a folder path to `/summarize-paper` (e.g., `/summarize-paper ~/papers/`) and it automatically switches to batch mode. Each paper gets a full individual summary, plus a cross-paper analysis index. You can also provide multiple files at once.
 
 **Q: Does it work with Chinese papers?**
 A: Yes. Language auto-detection works for Chinese and English. Output is always in Chinese.

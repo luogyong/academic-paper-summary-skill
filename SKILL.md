@@ -134,17 +134,30 @@ tags: [academic-research, paper-analysis, focus-method, obsidian, chinese-suppor
 ## 工作流概览
 
 ```
-用户上传论文（或粘贴文本）
-  ↓
-[可选] MinerU 提取全文（PDF/Word/图片）
-  ↓
-FOCUS 阶段A：逐段抽取（含细节、引文、指标）
-  ↓
-FOCUS 阶段B：清理、结构化、添加概述
-  ↓
-Obsidian 格式化（frontmatter + wiki-link）
-  ↓
-[可选] 导出 Markdown 到 Obsidian vault 或显示在对话中
+用户输入
+  ├── 单篇论文（PDF/文本/URL）→ 单篇模式
+  │     ↓
+  │   [可选] MinerU 提取全文（PDF/Word/图片）
+  │     ↓
+  │   FOCUS 阶段A：逐段抽取（含细节、引文、指标）
+  │     ↓
+  │   FOCUS 阶段B：清理、结构化、添加概述
+  │     ↓
+  │   Obsidian 格式化（frontmatter + wiki-link）
+  │     ↓
+  │   [可选] 导出 Markdown 到 Obsidian vault 或显示在对话中
+  │
+  └── 文件夹路径 / 多个文件 → 批量模式
+        ↓
+      扫描文件夹 → 发现 N 个论文文件
+        ↓
+      批量 MinerU 提取（容错跳过失败文件）
+        ↓
+      顺序执行 FOCUS 阶段A+B（每篇独立）
+        ↓
+      保存每篇总结 + 生成批量索引
+        ↓
+      [可选] 批量 Wiki 化（实体/概念去重合并）
 ```
 
 ---
@@ -164,28 +177,9 @@ Obsidian 格式化（frontmatter + wiki-link）
 使用FOCUS方法分析这篇论文
 ```
 
-### 批量处理触发方式
+### 用户输入方式
 
-在对话中输入以下任一指令启动批量文件夹处理：
-
-```
-/summarize-folder
-批量总结论文
-批量论文总结
-总结文件夹里的论文
-summarize folder
-batch summarize papers
-```
-
-你也可以直接提供一个文件夹路径，Skill 将自动进入批量处理模式：
-```
-/summarize-folder ~/Downloads/papers/
-批量总结论文 H:/Papers/ICML2024/
-```
-
-### 用户输入方式（三选一）
-
-**选项 1：上传 PDF/Word/图片**
+**选项 1：单篇论文（PDF/Word/图片）**
 ```
 用户：/summarize-paper
 + 上传 paper.pdf（或 paper.docx、paper.png）
@@ -202,6 +196,21 @@ batch summarize papers
 用户：/summarize-paper
 输入：https://example.com/paper.pdf
 ```
+
+**选项 4：批量处理 — 提供文件夹路径**
+```
+用户：/summarize-paper ~/Downloads/papers/
+或
+用户：/summarize-paper --recursive ~/Downloads/papers/
+```
+> Skill 自动检测到文件夹路径，进入批量处理模式，依次总结文件夹内的所有论文。
+
+**选项 5：批量处理 — 上传多个文件**
+```
+用户：/summarize-paper
++ 上传 paper1.pdf, paper2.pdf, paper3.docx
+```
+> Skill 检测到多个文件（≥2），自动进入批量处理模式。
 
 ---
 
@@ -366,7 +375,13 @@ batch summarize papers
 #### 0.3 检测输入类型并处理
 
 1. **识别用户输入**
-   - 如果用户上传了 PDF/Word/图片：
+   - 如果用户提供了文件夹路径（目录存在，非文件路径）：
+     * **自动进入批量处理模式**（详见 §批量文件夹处理模式）
+     * 跳转到步骤 B0：文件扫描与发现
+   - 如果用户一次性上传了多个文件（≥2 个 PDF/Word/图片）：
+     * **自动进入批量处理模式**
+     * 跳转到步骤 B0，将多文件列表作为待处理列表
+   - 如果用户上传了单个 PDF/Word/图片：
      * **检查 MinerU 状态**
      * 如果可用：调用 MinerU 提取工具
      * 如果不可用或提取失败：
@@ -1081,9 +1096,9 @@ Wiki 集成：
 ### 模式识别
 
 **判断条件**（满足任一即进入批量模式）：
-1. 用户提供了文件夹路径（而非单文件路径）
-2. 用户使用了批量触发关键词（如 `/summarize-folder`、`批量总结论文` 等）
-3. 用户一次性上传了多个文件（≥2 个）
+1. 用户提供了文件夹路径（而非单个文件路径）
+2. 用户一次性上传了多个文件（≥2 个）
+3. 用户明确表示要对整个文件夹或批量文件进行总结（如"总结文件夹里的论文"、"批量总结"等）
 
 **确认检测结果**：
 ```
@@ -1400,7 +1415,7 @@ created: 2026-06-05
 2. 在 Obsidian 图谱视图中探索关联
 
 提示：如需重新处理失败的文件，修复后运行：
-/summarize-folder --retry-failed GPT-3.pdf
+/summarize-paper --retry-failed GPT-3.pdf
 ```
 
 ---
@@ -1553,7 +1568,7 @@ $$L = -\sum_{i} p(y_i) \log q(y_i)$$
 
 **解决**：
 1. 检查 `_batch_progress.json` 了解进度
-2. 重新运行 `/summarize-folder` 自动检测并从中断处继续
+2. 重新运行 `/summarize-paper` 并指定同一文件夹，自动检测 `_batch_progress.json` 并从中断处继续
 3. 查看索引文件中的失败列表，了解具体错误原因
 4. 修复问题文件后，使用 `--retry-failed` 仅重新处理失败项
 
