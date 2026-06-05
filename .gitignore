@@ -1,0 +1,10 @@
+# MinerU output
+_paper_output/
+
+# Obsidian
+.obsidian/
+.vault-meta/
+
+# OS
+.DS_Store
+Thumbs.db
