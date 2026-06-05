@@ -3,12 +3,13 @@ name: academic-paper-summary
 description: >-
   使用FOCUS方法对学术论文进行严谨、细节保留的总结。当用户说"总结论文"、"论文总结"、
   "/summarize-paper"、"学术论文分析"、"提取论文核心内容"、"详细论文摘要"时触发。
-  支持PDF/Word/图片（通过MinerU提取）、中文详细分析、Markdown输出、直接导入Obsidian。
+  支持PDF/Word/图片（通过MinerU提取）、中文详细分析、Markdown输出、直接导入Obsidian、
+  批量文件夹处理（一次性总结整个文件夹的所有论文）。
   特别适合需要完整捕捉论文细节、用于文献综述、研究复审的研究人员。
 version: 0.1.0
 author: Research Workflow Skills
 license: MIT
-tags: [academic-research, paper-analysis, focus-method, obsidian, chinese-support]
+tags: [academic-research, paper-analysis, focus-method, obsidian, chinese-support, batch-processing]
 ---
 
 # 学术论文总结 Skill
@@ -26,6 +27,7 @@ tags: [academic-research, paper-analysis, focus-method, obsidian, chinese-suppor
 | **Obsidian Wiki 化** | 自动生成 wiki-link 格式（`[[双方括号]]`）、frontmatter metadata、标签系统 |
 | **自动笔记导出**     | 结果直接导出为`.md` 文件，可一键导入 Obsidian vault                       |
 | **多格式支持**       | PDF、Word、图片、网页、纯文本                                             |
+| **批量文件夹处理**   | 一次性扫描并总结整个文件夹内的所有论文，自动生成批量索引                  |
 
 ---
 
@@ -160,6 +162,25 @@ Obsidian 格式化（frontmatter + wiki-link）
 提取论文核心内容
 详细论文摘要
 使用FOCUS方法分析这篇论文
+```
+
+### 批量处理触发方式
+
+在对话中输入以下任一指令启动批量文件夹处理：
+
+```
+/summarize-folder
+批量总结论文
+批量论文总结
+总结文件夹里的论文
+summarize folder
+batch summarize papers
+```
+
+你也可以直接提供一个文件夹路径，Skill 将自动进入批量处理模式：
+```
+/summarize-folder ~/Downloads/papers/
+批量总结论文 H:/Papers/ICML2024/
 ```
 
 ### 用户输入方式（三选一）
@@ -1051,6 +1072,360 @@ Wiki 集成：
 **如果 wiki 索引更新失败**：不阻断主流程，提示用户手动更新。
 **如果 wiki-lock 获取失败**：等待 2 秒重试；再次失败则跳过该页面，记录到 log。
 
+---
+
+## 批量文件夹处理模式
+
+> **适用场景**：当你需要对整个文件夹中的所有论文一次性生成总结，而非逐篇手动处理。适合文献综述初期、会议论文批量阅读、课题组论文归档等场景。
+
+### 模式识别
+
+**判断条件**（满足任一即进入批量模式）：
+1. 用户提供了文件夹路径（而非单文件路径）
+2. 用户使用了批量触发关键词（如 `/summarize-folder`、`批量总结论文` 等）
+3. 用户一次性上传了多个文件（≥2 个）
+
+**确认检测结果**：
+```
+=== 检测到批量处理模式 ===
+输入类型：文件夹路径 / 批量触发词 / 多文件上传
+准备进入批量处理流程...
+```
+
+---
+
+### 步骤 B0：文件扫描与发现
+
+**执行扫描**：
+
+使用 Bash 工具扫描目标文件夹中的所有支持格式：
+
+```bash
+# 扫描文件夹中的支持文件
+find "目标文件夹路径" -maxdepth 1 -type f \( \
+  -iname "*.pdf" -o \
+  -iname "*.docx" -o \
+  -iname "*.doc" -o \
+  -iname "*.pptx" -o \
+  -iname "*.ppt" -o \
+  -iname "*.png" -o \
+  -iname "*.jpg" -o \
+  -iname "*.jpeg" \) \
+  -exec ls -lh {} \; 2>/dev/null | sort
+
+# 统计文件数量
+FILE_COUNT=$(find "目标文件夹路径" -maxdepth 1 -type f \( -iname "*.pdf" -o -iname "*.docx" -o -iname "*.doc" -o -iname "*.pptx" -o -iname "*.ppt" -o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) | wc -l)
+```
+
+**递归模式（可选）**：
+
+如果用户使用 `--recursive` 或 `-r` 参数，移除 `-maxdepth 1` 限制，递归扫描所有子文件夹：
+
+```bash
+# 递归扫描（含子文件夹）
+find "目标文件夹路径" -type f \( \
+  -iname "*.pdf" -o -iname "*.docx" -o -iname "*.doc" -o \
+  -iname "*.pptx" -o -iname "*.ppt" -o \
+  -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" \) \
+  -exec ls -lh {} \; 2>/dev/null | sort
+```
+
+**展示扫描结果**：
+
+```
+=== 文件夹扫描结果 ===
+路径：/path/to/folder
+扫描模式：当前文件夹（非递归）
+
+找到 5 个文件：
+
+  1. Attention_Is_All_You_Need.pdf (2.3 MB)
+  2. BERT_Pre-training_of_Deep_Bidirectional_Transformers.pdf (1.8 MB)
+  3. GPT-3_Language_Models_are_Few-Shot_Learners.pdf (3.1 MB)
+  4. ResNet_Deep_Residual_Learning_for_Image_Recognition.pdf (1.5 MB)
+  5. ViT_An_Image_is_Worth_16x16_Words.pdf (2.7 MB)
+
+预计总处理时间：约 10-15 分钟（基于文件大小估算）
+
+是否继续批量处理？[Y/n]
+```
+
+**去重检查**：
+- 检查输出目录中是否已有同名 `.md` 总结文件
+- 如果已有，标记为"已存在"，询问是否跳过或覆盖
+- 如果用户使用 `--skip-existing` 参数，自动跳过已生成总结的文件
+
+**文件数过多警告**：
+- 如果文件数 > 20：提示用户考虑分批处理
+- 如果文件数 > 50：建议使用 `--recursive` 按子文件夹分批处理
+
+---
+
+### 步骤 B1：批量 MinerU 提取
+
+**前置条件**：步骤 0.1 已完成 MinerU 可用性检测。
+
+#### MinerU CLI 可用时
+
+对每个文件依次调用 MinerU 提取，输出到统一临时目录：
+
+```bash
+# 创建批量输出目录
+mkdir -p ./_batch_output/
+
+# 对每个文件执行提取
+for file in "文件1.pdf" "文件2.pdf" ...; do
+  echo "[$N/$TOTAL] 提取中：$file"
+  mineru-open-api extract "$file" -o "./_batch_output/$(basename "$file" | sed 's/\.[^.]*$//')/" -f md
+done
+```
+
+#### MinerU MCP 可用时
+
+逐个调用 MCP 工具提取，同样输出到 `_batch_output/`。
+
+#### MinerU 不可用时
+
+```
+⚠ MinerU 当前不可用。
+
+批量模式下，请选择一个替代方案：
+1. 为每个文件手动粘贴论文文本（逐个处理）
+2. 使用 PDF 阅读器批量导出文本后再处理
+3. 仅处理少数重点论文，逐个粘贴
+
+请输入选择（1/2/3）：
+```
+
+#### 容错处理
+
+提取过程中单个文件失败不中断整体流程：
+
+```
+=== MinerU 提取进度 ===
+[1/5] Attention_Is_All_You_Need.pdf ✓ 成功（提取 8,234 字）
+[2/5] BERT.pdf ✓ 成功（提取 12,456 字）
+[3/5] GPT-3.pdf ✗ 失败：文件已损坏，无法打开
+[4/5] ResNet.pdf ✓ 成功（提取 9,123 字）
+[5/5] ViT.pdf ✓ 成功（提取 7,890 字）
+
+提取完成：4 成功，1 失败
+失败列表：
+  - GPT-3.pdf：文件已损坏，无法打开
+```
+
+---
+
+### 步骤 B2：顺序 FOCUS 处理
+
+**核心流程**：对每个成功提取的论文，依次执行完整的 FOCUS 两阶段分析。
+
+**处理逻辑**：
+
+1. 按文件名字母顺序或用户指定的顺序处理
+2. 每篇论文独立执行完整的 FOCUS 流程（阶段 A + 阶段 B）
+3. 每篇论文独立生成最终 Markdown 输出
+4. 保存到输出目录（默认与源文件同目录，或用户指定的输出目录）
+
+**进度展示**：
+
+```
+=== FOCUS 分析进度 ===
+
+────────────────────────────────────────
+[1/4] 处理中：Attention Is All You Need
+────────────────────────────────────────
+  ✓ 阶段 A：逐段提取完成（识别 6 个章节，提取 42 个关键点）
+  ✓ 阶段 B：结构化完成（8 个主题组，质量检查通过）
+  ✓ 已保存：Attention_Is_All_You_Need_2026-06-05.md
+
+────────────────────────────────────────
+[2/4] 处理中：BERT: Pre-training of Deep Bidirectional Transformers
+────────────────────────────────────────
+  ✓ 阶段 A：逐段提取完成（识别 7 个章节，提取 38 个关键点）
+  ✓ 阶段 B：结构化完成（8 个主题组，质量检查通过）
+  ✓ 已保存：BERT_2026-06-05.md
+
+...
+```
+
+**容错处理**：
+- 单篇 FOCUS 处理失败：记录错误原因，跳过该篇，继续处理下一篇
+- 不因一篇论文的失败而中断整个批量流程
+
+**中断与恢复**：
+- 每处理完一篇论文，记录进度到 `_batch_progress.json`
+- 如果用户中断（Ctrl+C），保留已完成的结果文件
+- 下次重新执行时，检测 `_batch_progress.json`，跳过已处理的文件
+- 进度文件格式：
+  ```json
+  {
+    "folder": "/path/to/folder",
+    "started": "2026-06-05T10:30:00",
+    "total": 5,
+    "completed": ["file1.pdf", "file2.pdf"],
+    "failed": {"GPT-3.pdf": "文件已损坏"},
+    "pending": ["ResNet.pdf", "ViT.pdf"]
+  }
+  ```
+
+**大批量处理策略**：
+- 文件数 ≤ 5：连续处理，不做暂停
+- 文件数 6-15：每 5 篇暂停确认一次
+- 文件数 > 15：每 10 篇暂停确认一次，并建议分批处理
+
+---
+
+### 步骤 B3：生成批量索引文件
+
+在所有论文处理完毕后，在输出目录生成批量索引文件 `_batch_index_YYYY-MM-DD.md`：
+
+**索引文件结构**：
+
+```markdown
+---
+title: "批量论文总结索引"
+date: 2026-06-05
+folder: "/path/to/folder"
+total: 5
+succeeded: 4
+failed: 1
+tags: [batch-summary, paper-index]
+created: 2026-06-05
+---
+
+# 批量论文总结索引
+
+## 处理摘要
+
+| 项目 | 详情 |
+|------|------|
+| 处理日期 | 2026-06-05 10:30 - 11:45 |
+| 源文件夹 | `/path/to/folder` |
+| 总计 | 5 篇 |
+| 成功 | 4 篇 |
+| 失败 | 1 篇 |
+| MinerU 版本 | CLI v2.1.0 |
+| 输出目录 | `/path/to/folder/` |
+
+---
+
+## 论文列表
+
+| # | 论文标题 | 年份 | 核心主题 | 来源文件 | 总结文件 |
+|---|---------|------|---------|---------|---------|
+| 1 | [[Attention Is All You Need]] | 2017 | Transformer 架构、自注意力机制 | [Attention_Is_All_You_Need.pdf](Attention_Is_All_You_Need.pdf) | [总结](Attention_Is_All_You_Need_2026-06-05.md) |
+| 2 | [[BERT]] | 2019 | 预训练语言模型、双向 Transformer | [BERT.pdf](BERT.pdf) | [总结](BERT_2026-06-05.md) |
+| 3 | [[ResNet]] | 2016 | 深度残差学习、图像识别 | [ResNet.pdf](ResNet.pdf) | [总结](ResNet_2026-06-05.md) |
+| 4 | [[ViT]] | 2021 | Vision Transformer、图像分类 | [ViT.pdf](ViT.pdf) | [总结](ViT_2026-06-05.md) |
+| — | ~~GPT-3~~ | ~~2020~~ | ~~大规模语言模型~~ | ~~GPT-3.pdf~~ | ❌ 提取失败 |
+
+---
+
+## 跨论文主题分析
+
+### 共同主题
+- **Transformer 架构**：论文 #1, #2, #4 均基于 Transformer 或其变体
+- **预训练-微调范式**：论文 #2, #3 均采用了预训练 + 下游任务微调的策略
+
+### 方法对比
+
+| 维度 | Attention Is All You Need | BERT | ViT |
+|------|--------------------------|------|-----|
+| 架构 | Encoder-Decoder | Encoder-only | Encoder-only |
+| 参数量 | 65M / 213M | 110M / 340M | 86M / 307M |
+| 核心创新 | 自注意力取代 RNN | 双向预训练 | Transformer 用于视觉 |
+| 基准数据集 | WMT 2014 | GLUE / SQuAD | ImageNet-21K |
+
+> **研究趋势观察**：从 2017 到 2021，Transformer 从 NLP 领域的序列建模工具，逐步演变为跨模态通用架构。参数规模也呈现显著增长趋势。
+
+---
+
+## 失败列表
+
+| 文件 | 阶段 | 错误原因 |
+|------|------|---------|
+| GPT-3.pdf | MinerU 提取 | 文件已损坏，无法打开 |
+```
+
+---
+
+### 步骤 B4：Wiki 化与最终确认
+
+#### Wiki 化（Claude-Obsidian Wiki 已配置时）
+
+对所有成功处理的论文，依次执行 §4.2 的 Wiki 化流程：
+1. 逐个为论文总结页面添加 wiki 增强 frontmatter
+2. 批量提取实体和概念（去重合并）
+3. 创建/更新 wiki 实体页面和概念页面
+4. 更新 `wiki/index.md`（批量添加条目）
+5. 更新 `wiki/hot.md`（记录批量上下文）
+6. 记录 `wiki/log.md`
+
+```
+=== Wiki 化进度 ===
+[1/4] Attention Is All You Need → wiki/sources/ ✓
+  新建实体：Vaswani, A.; Transformer; WMT 2014
+  新建概念：Self-Attention; Multi-Head Attention; Positional Encoding
+[2/4] BERT → wiki/sources/ ✓
+  新建实体：Devlin, J.; Google AI; GLUE Benchmark
+  新建概念：MLM; NSP; Bidirectional Pre-training
+...
+去重合并后：12 个实体页面，8 个概念页面
+```
+
+#### 最终确认
+
+```
+╔══════════════════════════════════════╗
+║     ✅ 批量处理完成！               ║
+╠══════════════════════════════════════╣
+║ 总计：5 篇                          ║
+║ 成功：4 篇                          ║
+║ 失败：1 篇（GPT-3.pdf：提取失败）   ║
+║                                    ║
+║ 输出目录：/path/to/folder/          ║
+║ 索引文件：_batch_index_2026-06-05.md║
+║                                    ║
+║ Wiki 集成：                         ║
+║  - 新建实体页面：12 个              ║
+║  - 新建概念页面：8 个               ║
+║  - 索引已更新                       ║
+║                                    ║
+║ ⏱ 总耗时：约 15 分钟               ║
+╚══════════════════════════════════════╝
+
+快速浏览：
+1. 打开 _batch_index_2026-06-05.md 查看索引
+2. 在 Obsidian 图谱视图中探索关联
+
+提示：如需重新处理失败的文件，修复后运行：
+/summarize-folder --retry-failed GPT-3.pdf
+```
+
+---
+
+### 步骤 B5：错误处理（批量模式专用）
+
+| 错误类型 | 处理方式 |
+|---------|---------|
+| **MinerU 提取失败** | 跳过该文件，记录到失败列表，继续处理下一个 |
+| **FOCUS 处理失败** | 跳过该论文，记录错误原因，继续处理 |
+| **文件写入失败** | 检查磁盘空间和权限，暂停并警告用户 |
+| **用户中断** | 保存当前进度到 `_batch_progress.json`，已完成的文件保留 |
+| **磁盘空间不足** | 暂停处理，警告用户，提示清理空间 |
+| **Wiki 索引更新失败** | 不阻断主流程，记录到错误日志，提示用户手动更新 |
+| **全部文件提取失败** | 降级为文本输入模式，逐个引导用户粘贴 |
+
+**中断恢复流程**：
+```
+检测到未完成的批量任务...
+上次进度：[2/5] 已完成，[1] 失败，[2] 待处理
+是否从中断处继续？[Y/n]
+```
+
+---
+
 ## 常见场景处理
 
 ### 场景 1：长篇论文（20+ 页）
@@ -1113,6 +1488,27 @@ $$L = -\sum_{i} p(y_i) \log q(y_i)$$
 其中 $p$ 为真实分布，$q$ 为模型预测。该损失函数在分类任务中广泛使用，相比 MSE 损失具有更快的收敛速度。
 ```
 
+### 场景 5：批量文件夹处理
+
+**处理方式**：
+- 进入批量处理模式（§批量文件夹处理模式），扫描文件夹中所有支持的论文文件
+- 按文件名字母顺序依次处理，每篇论文独立生成完整总结
+- 处理完成后生成批量索引文件（`_batch_index_YYYY-MM-DD.md`），包含跨论文主题分析
+- 默认跳过已有同名 `.md` 总结文件的论文（使用 `--force` 强制重新处理）
+- 支持 `--recursive` 递归扫描子文件夹
+- 单个文件失败不阻塞其余文件，失败列表记录在索引文件中
+
+**适用子场景**：
+
+| 子场景 | 处理参数 | 说明 |
+|--------|---------|------|
+| 少量论文（≤5 篇） | 默认连续处理 | 无需暂停确认 |
+| 中等批量（6-15 篇） | 每 5 篇暂停确认 | 可检查质量后继续 |
+| 大批量（>15 篇） | 每 10 篇暂停，建议分批 | 避免单次处理过长 |
+| 递归扫描 | `--recursive` 参数 | 按子文件夹组织输出 |
+| 补处理失败项 | `--retry-failed` 参数 | 仅重新处理上次失败的项 |
+| 中断恢复 | 自动检测 `_batch_progress.json` | 从中断处继续 |
+
 ---
 
 ## 故障排查
@@ -1148,6 +1544,29 @@ $$L = -\sum_{i} p(y_i) \log q(y_i)$$
 1. 确认 Obsidian 中该笔记存在（路径匹配）
 2. 在 Obsidian 设置中启用"自动关联面板"
 3. 手动在相关笔记中补充 backlink
+
+---
+
+### 问题：批量处理中断或部分失败
+
+**症状**：批量处理中途停止，或部分论文处理失败
+
+**解决**：
+1. 检查 `_batch_progress.json` 了解进度
+2. 重新运行 `/summarize-folder` 自动检测并从中断处继续
+3. 查看索引文件中的失败列表，了解具体错误原因
+4. 修复问题文件后，使用 `--retry-failed` 仅重新处理失败项
+
+---
+
+### 问题：文件夹中有非论文文件被误扫
+
+**症状**：扫描结果中包含非学术论文的文件（如书籍、幻灯片、表格等）
+
+**解决**：
+1. 在批量处理前，将论文文件移到单独的子文件夹
+2. 或手动从确认列表中排除非论文文件
+3. 建议保持论文文件夹的整洁性，避免混合文件类型
 
 ---
 

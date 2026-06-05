@@ -21,6 +21,7 @@ A Claude Code skill that transforms academic papers into detailed, structured su
 | **Chinese-Optimized Output** | All instructions, section headers, and explanations in Chinese; preserves English technical terms |
 | **Reproducibility Checklist** | Auto-generated checklist of dataset, metrics, hardware, hyperparams mentioned in the paper |
 | **Multi-Modal Input** | Accept PDF, Word, images, URLs, or pasted text |
+| **Batch Folder Processing** | Scan a folder, sequentially summarize all papers, generate batch index with cross-paper analysis |
 
 ---
 
@@ -81,6 +82,13 @@ In Claude Code, any of these will activate the skill:
 提取论文核心内容
 详细论文摘要
 使用FOCUS方法分析这篇论文
+
+# Batch processing:
+/summarize-folder
+批量总结论文
+批量论文总结
+总结文件夹里的论文
+summarize folder
 ```
 
 ### Input Methods
@@ -101,6 +109,41 @@ In Claude Code, any of these will activate the skill:
 ```
 /summarize-paper
 https://arxiv.org/pdf/1706.03762.pdf
+```
+
+### Batch Folder Processing (NEW)
+
+Summarize all papers in a folder with a single command:
+
+```bash
+# Batch summarize all papers in a folder
+/summarize-folder ~/Downloads/papers/
+
+# With recursive scanning (includes subfolders)
+/summarize-folder ~/Downloads/papers/ --recursive
+
+# Skip already-summarized papers
+/summarize-folder ~/Downloads/papers/ --skip-existing
+
+# Retry previously failed papers only
+/summarize-folder ~/Downloads/papers/ --retry-failed
+```
+
+The batch mode will:
+1. Scan the folder for all supported files (PDF, DOCX, images)
+2. Extract text from each via MinerU (with per-file error tolerance)
+3. Run FOCUS analysis on each paper sequentially
+4. Generate individual summaries + a batch index file (`_batch_index_YYYY-MM-DD.md`)
+5. Include cross-paper thematic analysis in the index
+
+**Batch Trigger Keywords:**
+```
+/summarize-folder
+批量总结论文
+批量论文总结
+总结文件夹里的论文
+summarize folder
+batch summarize papers
 ```
 
 ### Quick Start Example
@@ -124,6 +167,20 @@ The skill will:
 4. Generate Obsidian-formatted Markdown with LaTeX formulas
 5. Auto-save to `wiki/sources/`
 6. If wiki is configured: extract entities/concepts, cross-reference, update index
+
+### Batch Quick Start
+
+```bash
+# 1. Navigate to your papers folder
+cd ~/Downloads/papers/
+
+# 2. Start Claude Code and run batch
+claude
+/summarize-folder ./
+
+# 3. Watch progress as each paper is processed
+# 4. Open _batch_index_YYYY-MM-DD.md for the overview
+```
 
 ---
 
@@ -353,6 +410,8 @@ Fallback: If MinerU is not installed, prompts user to paste paper text.
 
 ## 🏗️ Architecture
 
+### Single Paper Mode
+
 ```
 User Input (PDF / Text / URL)
   ↓
@@ -383,6 +442,42 @@ Step 3: Obsidian Formatting
 Step 4: Save & Wiki-ify
 ├── Wiki configured → Full wiki ingest (entities, concepts, index, hot, log)
 └── Wiki not configured → Plain Markdown save
+```
+
+### Batch Folder Mode (NEW)
+
+```
+User provides folder path (or batch trigger keyword)
+  ↓
+Step B0: File Discovery
+├── Scan folder for *.pdf, *.docx, *.pptx, *.png, *.jpg
+├── Check for existing summaries (skip/overwrite)
+└── Display file list, ask for confirmation
+  ↓
+Step B1: Batch MinerU Extraction
+├── Extract each file → _batch_output/{filename}/
+├── Track success/failure per file
+└── Error tolerance: skip failures, continue with rest
+  ↓
+Step B2: Sequential FOCUS Processing
+├── For each extracted file:
+│   ├── FOCUS Phase A (detailed extraction)
+│   ├── FOCUS Phase B (cleanup & structure)
+│   ├── Save individual summary .md
+│   └── Update _batch_progress.json (checkpoint)
+├── Progress display: [N/M] with status
+└── Interrupt-resume support
+  ↓
+Step B3: Generate Batch Index
+├── _batch_index_YYYY-MM-DD.md
+├── Processing summary (total/succeeded/failed)
+├── Paper list table with links
+└── Cross-paper thematic analysis
+  ↓
+Step B4: Wiki-ify & Final Confirmation
+├── Batch wiki ingest (entities, concepts, index)
+├── Dedup merged entities/concepts across papers
+└── Final summary display
 ```
 
 ---
@@ -445,7 +540,7 @@ A: The skill works standalone. Choose "display Markdown" when saving, and use wi
 A: The skill preserves LaTeX formulas whenever possible. For papers with heavy equation content, formulas are kept in `$$...$$` blocks.
 
 **Q: Can I summarize multiple papers at once?**
-A: Yes. The skill handles multi-paper comparison mode with cross-paper analysis.
+A: Yes! Use `/summarize-folder` to batch-process an entire folder of papers. Each paper gets a full individual summary, plus a cross-paper analysis index. You can also use `/summarize-paper` with multiple papers for comparison mode.
 
 **Q: Does it work with Chinese papers?**
 A: Yes. Language auto-detection works for Chinese and English. Output is always in Chinese.
