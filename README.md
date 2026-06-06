@@ -22,6 +22,8 @@ A Claude Code skill that transforms academic papers into detailed, structured su
 | **Reproducibility Checklist** | Auto-generated checklist of dataset, metrics, hardware, hyperparams mentioned in the paper |
 | **Multi-Modal Input** | Accept PDF, Word, images, URLs, or pasted text |
 | **Batch Folder Processing** | Scan a folder, sequentially summarize all papers, generate batch index with cross-paper analysis |
+| **Figure & Table Extraction** | Auto-extract figures/tables as PNG, embed in notes with `![[figure.png]]` for Obsidian preview |
+| **Textbook/Book Chapter Mode** | Auto-detect books, split by chapter, summarize each chapter, generate book index, wiki-ingest chapter-by-chapter |
 
 ---
 
@@ -171,6 +173,44 @@ claude
 # 4. Open _batch_index_YYYY-MM-DD.md for the overview
 ```
 
+### Textbook Quick Start
+
+```bash
+# 1. Process a textbook — auto-detected as book by length + chapter structure
+/summarize-paper ~/Books/machine-learning-intro.pdf
+
+# The skill will:
+# 1. Auto-detect it's a textbook (length + chapter headings)
+# 2. Display the chapter structure and ask for confirmation
+# 3. Split by chapter, process each independently
+# 4. Generate per-chapter notes + a book index with reading routes
+
+# Process only specific chapters
+/summarize-paper ~/Books/ml-intro.pdf --chapters 3-8
+
+# Process chapters 1, 3, and 5-8
+/summarize-paper ~/Books/ml-intro.pdf --chapters 1,3,5-8
+```
+
+### Figure Extraction
+
+Figures and tables are automatically extracted during MinerU processing:
+
+```bash
+# Standard usage — figures auto-extracted when MinerU is available
+/summarize-paper ~/papers/transformer.pdf
+
+# Output structure:
+# paper_output/
+# ├── Transformer_summary.md     # Summary with ![[figures/fig_01.png]] links
+# └── figures/
+#     ├── fig_01.png              # Model architecture diagram
+#     ├── fig_02.png              # Attention visualization
+#     └── fig_03.png              # Training curves
+```
+
+In Obsidian, extracted figures render inline in reading mode. If MinerU cannot extract figures, a `[图表未提取]` marker is placed instead.
+
 ---
 
 ## 📊 Output Structure
@@ -224,6 +264,13 @@ Key quotes with source locations...
 
 ## 9. 我的笔记与关联
 Wiki-linked notes, concepts, and further reading...
+
+## 10. 图表索引
+Extracted figures/tables with embedded image links:
+
+| Figure | Title | Image |
+|--------|-------|-------|
+| Fig 1 | Model Architecture | ![[figures/fig_01.png]] |
 
 ## 质量控制报告
 Completeness verification checklist...
@@ -467,6 +514,47 @@ Step B4: Wiki-ify & Final Confirmation
 ├── Batch wiki ingest (entities, concepts, index)
 ├── Dedup merged entities/concepts across papers
 └── Final summary display
+```
+
+### Textbook/Book Chapter Mode (NEW)
+
+```
+User provides a book/textbook PDF
+  ↓
+Step C0: Document Type Confirmation
+├── Length check (>50 pages, >30K words)
+├── Structure detection (第X章 / Chapter N / Part N patterns)
+├── Content analysis (preface, exercises, bibliography — not abstract/experiments)
+└── Display chapter list → ask user to confirm or select range
+  ↓
+Step C1: Chapter Splitting
+├── MinerU extract full book → Markdown
+├── Split by chapter H1 headings
+├── Record per-chapter metadata (title, page count, word count)
+└── Create output directory structure (chapters/ + figures/)
+  ↓
+Step C2: Per-Chapter FOCUS Processing (sequential)
+├── For each chapter:
+│   ├── FOCUS Phase A (concepts, formulas, examples, figures)
+│   ├── FOCUS Phase B (structured output — textbook-adapted format)
+│   ├── Save individual chapter .md
+│   └── Update _book_progress.json (checkpoint)
+├── Progress display: [N/M] with status
+└── Interrupt-resume support
+  ↓
+Step C3: Generate Book Index
+├── {书名}_INDEX_{date}.md
+├── Book metadata (authors, publisher, year, pages)
+├── Chapter index table with links
+├── Cross-chapter thematic analysis + knowledge progression map
+└── Recommended reading routes (speed / standard / topical)
+  ↓
+Step C4: Wiki-ify
+├── Book index → wiki/sources/
+├── Per-chapter → wiki/sources/{book}/chapters/
+├── Entity page for the book itself
+├── Concepts aggregated across chapters
+└── Update wiki/index.md and wiki/hot.md
 ```
 
 ---
