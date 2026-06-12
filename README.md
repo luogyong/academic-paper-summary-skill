@@ -194,20 +194,29 @@ claude
 
 ### Figure Extraction
 
-Figures and tables are automatically extracted during MinerU processing:
+Figures and tables are automatically extracted during MinerU processing and stored alongside the original PDF for future reuse:
 
 ```bash
 # Standard usage — figures auto-extracted when MinerU is available
 /summarize-paper ~/papers/transformer.pdf
 
-# Output structure:
-# paper_output/
-# ├── Transformer_summary.md     # Summary with ![[figures/fig_01.png]] links
-# └── figures/
-#     ├── fig_01.png              # Model architecture diagram
-#     ├── fig_02.png              # Attention visualization
-#     └── fig_03.png              # Training curves
+# Output structure (co-located with the original PDF):
+# ~/papers/
+# ├── transformer.pdf                    # Original PDF (untouched)
+# └── transformer_mineru/                # MinerU extraction output (kept for reuse)
+#     ├── transformer.md                 # Full paper text with image references
+#     └── images/
+#         ├── fig_001.png                # Model architecture diagram
+#         ├── fig_002.png                # Results comparison chart
+#         └── fig_003.png                # Attention visualization
+#
+# Generated summary:
+# transformer_summary.md  (with inline figures + appendix)
 ```
+
+Figures appear in two places in the summary:
+1. **Inline** — embedded right below the relevant paragraph (e.g., method diagram after the methods section)
+2. **Appendix** — all figures listed at the end with full descriptions for reference
 
 In Obsidian, extracted figures render inline in reading mode. If MinerU cannot extract figures, a `[图表未提取]` marker is placed instead.
 

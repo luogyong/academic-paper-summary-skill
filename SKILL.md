@@ -43,25 +43,29 @@ tags: [academic-research, paper-analysis, focus-method, obsidian, chinese-suppor
   3. 如果都不可用，使用 fallback
 - **调用方式**：
   ```
-  # 提取 PDF 为 Markdown（输出到临时目录）
-  mineru-open-api extract "论文文件路径" -o ./_paper_output/ -f md
+  # 提取 PDF 为 Markdown，输出到与原文件相同目录（保留供后期使用）
+  # 输出目录命名规则：{原文件名（无扩展名）}_mineru/
+  mineru-open-api extract "论文文件路径" -o "{原文件所在目录}/{原文件名}_mineru/" -f md
   
-  # 或直接输出到 stdout
-  mineru-open-api extract "论文文件路径" -f md
+  # 示例：论文在 D:/papers/attention.pdf
+  # 则输出到：D:/papers/attention_mineru/
+  # 生成文件：D:/papers/attention_mineru/attention.md（含所有图片的 images/ 子目录）
   ```
   - 支持格式：PDF、图片（png/jpg）、Doc、Docx、Ppt、Pptx、Html
   - 文件限制：最大 200MB，最多 600 页
   - 输出格式：md（默认）、json、html、latex、docx
   - 支持批处理：`mineru-open-api extract *.pdf -o ./results/`
-  - **图表导出**：使用 `-f json` 可获取结构化输出，包含图片区域坐标和 base64 编码的图片数据；也可指定 `-f md` 同时生成 `images/` 子目录存放提取的图片文件
+  - **图表导出**：`-f md` 输出时，MinerU 会在输出目录下生成 `images/` 子目录，包含论文中所有图表的图片文件；图片在 md 文件中以 `![caption](images/fig_xxx.png)` 格式引用
+  - **重要**：提取的 md 文件与原 PDF 存储在同一目录下（`{原文件名}_mineru/` 子目录），方便后期直接复用，无需重复提取
 - **提取后处理**：
-  1. 如果输出到文件，使用 Read 工具读取提取后的 Markdown 文件
-  2. 如果输出到 stdout，直接使用提取的文本
-  3. 清理临时文件（如果适用）
+  1. 使用 Read 工具读取提取后的 Markdown 文件（路径：`{原文件所在目录}/{原文件名}_mineru/{原文件名}.md`）
+  2. 扫描 md 文件中所有图片引用（`![...](images/...)` 格式），建立图片索引
+  3. 记录每张图的：原始标题（caption）、文件路径、在原文中所属章节
+  4. 不清理提取输出目录（保留供后期使用）
 - **图表提取后处理**：
-  1. 如果输出为 JSON 格式，解析 `figures` 和 `tables` 字段
-  2. 提取图片保存到 `{output_dir}/figures/`，命名规则：`fig_01.png`、`fig_02.png`、`tab_01.png`
-  3. 在 Markdown 总结中使用 Obsidian 图片嵌入语法：`![[figures/fig_01.png]]`
+  1. 解析 MinerU md 文件中的所有 `![caption](images/filename)` 图片引用
+  2. 构建图片列表：`[{编号, caption, 文件路径, 所属章节}]`
+  3. 总结文档中使用相对路径引用图片：`![caption]({原文件名}_mineru/images/filename)`
   4. 记录每张图的原始标题（Figure caption）和编号
   5. 如果 MinerU 未提取到图片（纯文本 fallback），标注 `[图表未提取]`
 - **Fallback**：如果 MinerU 不可用或提取失败，礼貌地告知用户并要求粘贴纯文本
@@ -601,7 +605,21 @@ Claude-Obsidian Wiki：[✓ 已配置：模式 / ⚠ 未配置]
      * 在末尾添加 "相关论文" 部分，使用 wiki-link 格式
      * 例：`- [[AlphaFold论文]]`、`- [[Transformer综述]]`
 
-5. **质量检查**
+5. **图片嵌入规则（PDF 来源论文）**
+
+   当论文来自 PDF 且通过 MinerU 提取时，**必须**在总结各章节适当位置嵌入相关图片：
+   
+   - **嵌入时机**：在叙述某个方法、实验结果或消融研究时，如果原论文中对应章节有图，**立即在该段落下方嵌入图片**
+   - **嵌入格式**：
+     ```markdown
+     ![Fig. 1: 模型架构示意图]({原文件名}_mineru/images/fig_001.png)
+     > **图 1**：模型整体架构，包含三个主要模块：MSA编码器、结构预测头、推理加速蒸馏模块。
+     ```
+   - **图片路径**：使用相对路径，相对于总结文档保存位置；如在 Obsidian vault 中使用 `![[{原文件名}_mineru/images/filename]]` 语法
+   - **优先级**：方法图 > 结果图 > 消融图 > 其他图；每个主要章节至少尝试嵌入 1 张最相关的图
+   - **说明要求**：每张嵌入图必须附带 1-2 句说明，解释图的关键信息和在文中的作用
+
+6. **质量检查**
    在生成输出前，自我检查：
    - [ ] 所有量化指标已保留（n值、p-value、百分比）
    - [ ] 所有方法名、模型名、数据集名已保留
@@ -612,6 +630,8 @@ Claude-Obsidian Wiki：[✓ 已配置：模式 / ⚠ 未配置]
    - [ ] Wiki-link 已转换
    - [ ] UTF-8 编码（中文无乱码）
    - [ ] LaTeX 公式语法正确，可在 Obsidian 中渲染
+   - [ ] 各章节适当位置已嵌入相关图片（PDF 来源时）
+   - [ ] 文档末尾包含图片附录（PDF 来源时）
 
 ---
 
@@ -692,6 +712,9 @@ related_papers:
    - 蒸馏到轻量模型（2000万参数）
    - 推理时间：单个蛋白质 ~2分钟（GPU）
 
+![Fig. 1: 模型整体架构](attention_mineru/images/fig_001.png)
+> **图 1**：模型整体架构示意图，展示 MSA 编码器、结构预测头、推理加速蒸馏模块三大核心组件及其连接方式。
+
 ---
 
 ## 3. 实验结果
@@ -709,6 +732,9 @@ related_papers:
    | 本方法 | 85.3 | 0.91 | 2.1 min |
    | Baseline-A | 62.5 | 0.76 | 12 min |
    | Baseline-B | 70.1 | 0.82 | 8 min |
+
+![Fig. 2: CASP14 结果对比](attention_mineru/images/fig_002.png)
+> **图 2**：CASP14 基准测试结果对比，本方法（蓝色）在所有困难目标上显著超越 Baseline-A（灰色）和 Baseline-B（橙色），pLDDT 提升 45%。
 
 ---
 
@@ -799,26 +825,47 @@ related_papers:
 
 ---
 
-## 10. 图表索引
+## 附录：论文图表全览
 
-> **概述**：本节列出论文中的所有图表，图片已提取为 PNG 并可在 Obsidian 中直接预览。
+> **说明**：本节收录论文所有图表，图片由 MinerU 从原 PDF 提取，保存于 `attention_mineru/images/` 目录，方便后期直接引用。在 Obsidian 阅读模式下可直接预览。
 
-### 图 Figure
+### Fig. 1 — 模型整体架构
 
-| 编号 | 标题 | 图片 |
-|------|------|------|
-| Fig 1 | Model Architecture Overview | ![[figures/fig_01.png]] |
-| Fig 2 | Training Loss Curve | ![[figures/fig_02.png]] |
-| Fig 3 | Attention Map Visualization | ![[figures/fig_03.png]] |
+![Fig. 1: Model Architecture Overview](attention_mineru/images/fig_001.png)
 
-### 表 Table
+**说明**：模型整体架构示意图。左侧为 MSA 输入预处理模块（聚类 + Embedding），中间为 48 头 Transformer 编码器主体（隐层维度 384），右侧为结构预测头（二面角 + Cα-Cα 距离）和蒸馏轻量化模块。三大模块串联，实现端到端可微分结构预测。
 
-| 编号 | 标题 | 摘要 |
-|------|------|------|
-| Table 1 | CASP14 Benchmark Results | 本方法在 5/7 指标达到最优，pLDDT 85.3 | 
-| Table 2 | Ablation Study | 48头注意力最优，MSA深度对性能影响显著 |
+---
 
-> **提示**：图片保存在 `figures/` 子目录中。在 Obsidian 阅读模式下可直接预览。如果图片未能提取，请检查 MinerU JSON 输出。
+### Fig. 2 — CASP14 基准测试结果对比
+
+![Fig. 2: CASP14 Benchmark Results](attention_mineru/images/fig_002.png)
+
+**说明**：CASP14 官方测试集上各方法 pLDDT 得分对比柱状图。本方法（蓝色）达到 85.3，显著超越 Baseline-A（62.5，灰色）和 Baseline-B（70.1，橙色）。困难目标（TM-score < 0.5）子集中提升尤为明显，达 38%。
+
+---
+
+### Fig. 3 — 注意力图可视化
+
+![Fig. 3: Attention Map Visualization](attention_mineru/images/fig_003.png)
+
+**说明**：48 个注意力头对 MSA 序列的注意力权重热力图。不同头关注不同的序列位置模式：部分头捕获局部序列保守区，部分头关注长程协同变异位点。该图直观解释了模型如何从多序列比对中提取结构信息。
+
+---
+
+### Table 1 — CASP14 基准测试详细数据
+
+![Table 1: CASP14 Benchmark Results](attention_mineru/images/tab_001.png)
+
+**说明**：CASP14 测试集上各方法在 pLDDT、TM-score、GDT_TS、lDDT-Cα、推理时间五项指标的完整对比表。本方法在 5/5 指标上达到最优，推理时间（2.1 min/protein）也大幅优于所有对比方法。
+
+---
+
+### Table 2 — 消融研究数据
+
+![Table 2: Ablation Study](attention_mineru/images/tab_002.png)
+
+**说明**：注意力头数（12/24/48）与 MSA 深度（1k/5k/10k）的消融实验完整数据表。48 头 + 深度 10k 组合达到最优 85.3 pLDDT；减少任一超参均导致单调性能下降，验证了模型设计选择的合理性。
 
 ---
 

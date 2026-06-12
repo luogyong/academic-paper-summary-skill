@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk git *)",
+      "Bash(rtk git commit -m 'feat: add batch folder processing mode *)",
+      "Read(//c/Users/GYLUO/.claude/agents/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\GYLUO\\.claude\\agents"
+    ]
+  }
+}
